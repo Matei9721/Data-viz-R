@@ -1,0 +1,204 @@
+---
+title: "Assignment 5 - Data Visualization"
+output: pdf_document
+---
+
+Name: Matei Penca
+
+Studentnumber: s4039696
+
+
+### Packages & Data
+```{r warning = FALSE, message = FALSE}
+library(ggplot2)
+library(tidyverse)
+library(patchwork)
+library(grid)
+# Couldn't get extrafonts to work so I used this package
+library(showtext)
+# Could not fix link going out of the PDF
+data <- read_csv(
+  "https://raw.githubusercontent.com/fivethirtyeight/data/master/masculinity-survey/raw-responses.csv",
+  col_names = TRUE
+) %>%
+  select(q0005, age3)
+```
+
+### Code to clean and generate data for plotting
+```{r warning = FALSE, message = FALSE}
+order <- c("65+", "35-64", "18-34")
+
+data <- data %>% mutate(
+  age = case_when(
+    age3 == "65 and up" ~ "65+",
+    age3 == "35 - 64" ~ "35-64",
+    age3 == "18 - 34" ~ "18-34"),
+  age_order = factor(age, levels = order))
+
+# Same data, but I filter out the No answer as I need to plot it with geom_text
+label_data <- data %>%
+  filter(q0005 != "No answer") %>%
+  group_by(q0005) %>%
+  summarise(no = n())
+```
+
+
+### Fonts & graph texts
+```{r warning = FALSE, message = FALSE}
+
+# Load in the fonts from Google Fonts website
+font_add_google("Arimo", "arimo")
+font_add_google("Oxygen Mono", "oxygen")
+font_add_google("Noticia Text", "not")
+
+# Needed to generate the fonts in the PDF
+showtext_auto()
+
+title_text <- "Do you think that society puts pressure on men in a way
+that is unhealthy or bad for them?\n"
+
+subtitle_text <- "DATES                 NO. OF RESPONDENTS
+May 10-22, 2018       1,615 adult men"
+
+left_caption <- "FiveThirtyEight"
+right_caption <- "SOURCE: FIVETHIRTYEIGHT/DEATH, SEX & MONEY/SURVEYMONKEY"
+captions <- c(left_caption, right_caption)
+
+# Function to create the correct format for the X-axis
+format_axis <- function(x) {
+  new_vector <- c()
+  for (value in x) {
+    if (value == 0) {
+      v <- paste0(value * 100, "%")
+      new_vector <- c(new_vector, v)
+    } else {
+      v <- paste0(value * 100)
+      new_vector <- c(new_vector, v)
+    }
+  }
+
+  return(new_vector)
+}
+```
+
+
+### Create custom themes
+```{r warning = FALSE, message = FALSE}
+
+# Abstract theme that has common elements for both graphs
+abstract_theme <- theme(
+  panel.background = element_blank(),
+  panel.grid.major = element_blank(),
+  panel.grid.minor = element_blank(),
+  panel.border = element_blank(),
+)
+
+graph1_theme <- abstract_theme + theme(
+  axis.title.y = element_text(size = 10, angle = 0, vjust = 0.5),
+  axis.ticks.x = element_blank(),
+  plot.title.position = "plot",
+  plot.title = element_text(size = 13, vjust = -19, hjust = 0.009,
+    family = "arimo", face = "bold"),
+  plot.caption = element_text(hjust = 0.5, size = 10, family = "arimo",
+    colour = "#8a8a8a"),
+  axis.text.x = element_text(family = "not", color = "#8a8a8a", size = 11),
+  axis.ticks.y = element_blank(),
+  aspect.ratio = 0.099,
+)
+
+graph2_theme <- abstract_theme + theme(
+  plot.title.position = "plot",
+  plot.title = element_text(size = 9, hjust = 0.01),
+  axis.title.y = element_text(size = 15, angle = 0, hjust = 1.9),
+  axis.ticks.x = element_blank(),
+  axis.text.x = element_blank(),
+  axis.ticks.length.y = unit(1.5, "cm"), element_blank(),
+  axis.text.y = element_text(hjust = -0.007, size = 13, family = "arimo",
+    face = "bold", colour = "black"),
+  aspect.ratio = 0.38
+)
+
+grid_theme <- theme(plot.background = element_rect(fill = "#F0F0F0", 
+                                                   color = NA))
+
+patchworks_theme <- theme(
+                plot.title = element_text(size = 15, family = "arimo", 
+                                          face = "bold"), 
+                plot.caption = element_text(size = 8, hjust = c(0, 1), 
+                                            color = "#a1a1a1", family = "arimo",
+                                            face = "bold"),
+                plot.subtitle = element_text(size = 11, family = "oxygen", 
+                                             colour = "#a1a1a1")
+  )
+```
+
+
+### Code to create visualizations
+```{r fig.height=6, fig.width=6, fig.showtext = TRUE, warning = FALSE, message = FALSE}
+
+graph1 <- ggplot(data, aes(x = "", fill = q0005)) +
+  geom_hline(yintercept = seq(0.1, 0.9, by = 0.1), colour = "grey83", 
+             size = 0.5) +
+  geom_hline(yintercept = c(0.5), colour = "black", size = 0.5) +
+  geom_bar(position = "fill", show.legend = FALSE) +
+  labs(x = "", y = "", title = "All adult men", caption = "No answer") +
+  geom_hline(yintercept = c(0, 1), colour = "black", size = 0.5) +
+  # Requires position right instead of top because of flipped coordinates
+  scale_y_continuous(position = "right", breaks = seq(0, 1, by = 0.1), 
+                     labels = function(x) format_axis(x)) +
+  scale_fill_manual(values = c("#8CDADF", "#CDCDCD", "#ED713A")) +
+  geom_text(data = label_data, color = "black", fontface = "bold", size = 4.5, 
+            aes(label = q0005, y = c(0.66, 0.06), x = "")) +
+  coord_flip() +
+  graph1_theme
+
+graph2 <- ggplot(data, aes(x = age_order, fill = q0005)) +
+  geom_hline(yintercept = seq(0.1, 0.9, by = 0.1), colour = "grey83",
+             size = 0.5) +
+  geom_hline(yintercept = c(0.5), colour = "black", size = 0.5) +
+  geom_bar(position = "fill", show.legend = FALSE, width = 0.65) +
+  geom_hline(yintercept = c(0, 1), colour = "black", size = 0.5) +
+  scale_fill_manual(values = c("#8CDADF", "#CDCDCD", "#ED713A")) +
+  labs(x = "", y = "", title = "BY AGE GROUP") +
+  coord_flip() +
+  graph2_theme
+```
+
+
+### Code to combine vizualizations and set up grid lines
+```{r fig.height=6, fig.width=6, fig.showtext = TRUE, warning = FALSE, message = FALSE}
+
+patchwork <- graph1 / graph2
+patchwork + plot_annotation(title = title_text, subtitle = subtitle_text, 
+                            caption = captions, theme = patchworks_theme) & 
+  grid_theme
+
+grid.draw(linesGrob(x = unit(c(0.66, 0.66), "npc"),
+                    y = unit(c(0.57, 0.52), "npc"),
+                    gp = gpar(col = "gray", lwd = 2)))
+
+grid.draw(linesGrob(x = unit(c(0.65, 0.66), "npc"), 
+                    y = unit(c(0.52, 0.52), "npc"), 
+                    gp = gpar(col = "gray", lwd = 2)))
+
+grid.draw(linesGrob(x = unit(c(0.02, 0.98), "npc"), 
+                    y = unit(c(0.82, 0.82), "npc"), 
+                    gp = gpar(col = "gray", lwd = 2)))
+
+grid.draw(linesGrob(x = unit(c(0.02, 0.98), "npc"), 
+                    y = unit(c(0.71, 0.71), "npc"), 
+                    gp = gpar(col = "gray", lwd = 2)))
+
+grid.draw(linesGrob(x = unit(c(0.02, 0.98), "npc"), 
+                    y = unit(c(0.12, 0.12), "npc"), 
+                    gp = gpar(col = "gray", lwd = 2)))
+```
+
+
+### Description of visualization
+
+In the graph, we can see the survey results from FiveThirthyEight. We can see that the majority of adult men agreed that society puts pressure on men in an unhealthy or bad way. While the percentage for all men is almost 60%, if we split the data per age group we can see younger individuals were more likely to agree with the statement, having a percentage of 75%. Elderly males were split more equally, with just 54% in favor. This is probably because the younger generation is more likely to open up about how they feel when it comes to mental health even if it makes them more vulnerable. This also explains why the 35-64 age category is also in the middle of the two.
+
+Although the visualization shows the results per age category, it fails at showing the population size per age category. We know that there were a total of 1615 participants, but we don't know if they were evenly split or a category had the majority.
+
+The only thing I would have liked to improve in my graph are the fonts which are not 100% like in the original graph, but I tried to pick free version from Google Fonts that look similar.
